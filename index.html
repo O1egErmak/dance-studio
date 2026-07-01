@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Танцевальная студия</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<!-- Login -->
+<div id="loginScreen" class="login-screen" hidden>
+  <div class="login-card glass">
+    <div class="login-icon">💃</div>
+    <h1>Танцевальная студия</h1>
+    <p>Управление группами, абонементами и посещениями</p>
+    <button id="googleSignInBtn" class="btn-google">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.96 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Войти через Google
+    </button>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="mainApp" class="app" hidden>
+
+  <aside class="sidebar glass">
+    <div class="sidebar-brand">
+      <span>💃</span>
+      <span>Студия</span>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Группы</div>
+      <ul id="groupList" class="group-list"></ul>
+      <button id="addGroupBtn" class="btn-add-group">+ Добавить группу</button>
+    </div>
+
+    <div class="sidebar-bottom">
+      <img id="userAvatar" src="" alt="" class="avatar">
+      <span id="userName" class="user-name"></span>
+      <button id="signOutBtn" class="icon-btn" title="Выйти">⎋</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- No group selected -->
+    <div id="noGroup" class="empty-screen" hidden>
+      <div class="empty-icon">💃</div>
+      <h2>Выбери группу слева</h2>
+      <p>или создай новую нажав "+ Добавить группу"</p>
+    </div>
+
+    <!-- Group view -->
+    <div id="groupView" hidden>
+
+      <header class="main-header">
+        <div class="header-left">
+          <h1 id="groupTitle">Группа</h1>
+          <div class="period-picker glass">
+            <button id="prevMonth" class="icon-btn">‹</button>
+            <select id="monthSelect"></select>
+            <input type="number" id="yearInput" min="2020" max="2100">
+            <button id="nextMonth" class="icon-btn">›</button>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="renameGroupBtn" class="btn btn-ghost">✏️ Переименовать</button>
+          <button id="deleteGroupBtn" class="btn btn-danger-ghost">🗑 Удалить группу</button>
+        </div>
+      </header>
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-card glass">
+          <span class="stat-label">Учениц (абон)</span>
+          <span class="stat-value" id="statStudents">0</span>
+        </div>
+        <div class="stat-card glass">
+          <span class="stat-label">Сумма абон</span>
+          <span class="stat-value" id="statSubTotal">0 ₴</span>
+        </div>
+        <div class="stat-card glass">
+          <span class="stat-label">Разовые</span>
+          <span class="stat-value" id="statOneTime">0 ₴</span>
+        </div>
+        <div class="stat-card glass highlight">
+          <span class="stat-label">Итого за месяц</span>
+          <span class="stat-value" id="statTotal">0 ₴</span>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="subscriptions">📋 Абонементы</button>
+        <button class="tab" data-tab="attendance">✅ Разовые / явка</button>
+        <button class="tab" data-tab="settings">⚙️ Настройки месяца</button>
+      </div>
+
+      <!-- Tab: Subscriptions -->
+      <div id="tab-subscriptions" class="tab-panel panel glass active">
+        <div class="panel-header">
+          <h2>Абонементы</h2>
+          <button id="addStudentBtn" class="btn btn-primary">+ Добавить ученицу</button>
+        </div>
+
+        <table class="data-table" id="subscriptionTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>ФИО</th>
+              <th>Сумма абон, ₴</th>
+              <th>Заметка</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="subscriptionBody"></tbody>
+          <tfoot>
+            <tr class="table-total">
+              <td colspan="2">Итого</td>
+              <td id="subTotalFooter">0 ₴</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+        <p id="subEmpty" class="empty-hint" hidden>Добавьте первую ученицу ☝️</p>
+      </div>
+
+      <!-- Tab: Attendance -->
+      <div id="tab-attendance" class="tab-panel panel glass">
+        <div class="panel-header">
+          <h2>Разовые посещения</h2>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <label class="field-inline">
+              <span>Цена разового, ₴</span>
+              <input type="number" id="priceInput" min="0" step="50" placeholder="300">
+            </label>
+            <button id="addDateBtn" class="btn btn-primary">+ Добавить дату</button>
+          </div>
+        </div>
+
+        <div id="attendanceWrap">
+          <p id="attEmpty" class="empty-hint">Добавьте даты тренировок и учениц-разовиков</p>
+          <div class="attendance-scroll">
+            <table class="attendance-table" id="attendanceTable"></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Settings -->
+      <div id="tab-settings" class="tab-panel panel glass">
+        <h2>Настройки месяца</h2>
+        <div class="settings-grid">
+          <label class="field">
+            <span>Процент тренера 1 (основной), %</span>
+            <input type="number" id="trainer1Pct" min="0" max="100" value="60" placeholder="60">
+          </label>
+          <label class="field">
+            <span>Процент тренера 2, %</span>
+            <input type="number" id="trainer2Pct" min="0" max="100" value="40" placeholder="40">
+          </label>
+          <label class="field">
+            <span>Аренда зала, ₴</span>
+            <input type="number" id="rentInput" min="0" placeholder="0">
+          </label>
+          <label class="field">
+            <span>Прочие расходы, ₴</span>
+            <input type="number" id="otherExpInput" min="0" placeholder="0">
+          </label>
+        </div>
+
+        <div class="trainer-result glass">
+          <div class="trainer-row">
+            <span>Всего доход</span>
+            <strong id="resTotal">0 ₴</strong>
+          </div>
+          <div class="trainer-row">
+            <span>Расходы (аренда + прочее)</span>
+            <strong id="resExpenses">0 ₴</strong>
+          </div>
+          <div class="trainer-row">
+            <span>Чистый доход</span>
+            <strong id="resNet">0 ₴</strong>
+          </div>
+          <div class="trainer-row accent">
+            <span>Тренер 1 (<span id="t1pct">60</span>%)</span>
+            <strong id="resT1">0 ₴</strong>
+          </div>
+          <div class="trainer-row accent2">
+            <span>Тренер 2 (<span id="t2pct">40</span>%)</span>
+            <strong id="resT2">0 ₴</strong>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /groupView -->
+  </main>
+</div>
+
+<!-- Modals -->
+<div id="modalOverlay" class="modal-overlay" hidden>
+  <div class="modal glass" id="modal">
+    <h3 id="modalTitle">Заголовок</h3>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button id="modalCancel" class="btn btn-ghost">Отмена</button>
+      <button id="modalConfirm" class="btn btn-primary">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="script.js"></script>
+</body>
+</html>

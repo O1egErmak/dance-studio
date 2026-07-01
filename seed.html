@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Загрузка данных</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  body{font-family:sans-serif;background:#0e0a14;color:#f0f0f0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;padding:20px;}
+  h1{font-size:1.4rem;text-align:center;}
+  p{color:#aaa;text-align:center;max-width:480px;line-height:1.6;}
+  button{padding:14px 28px;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;transition:transform .15s;}
+  button:active{transform:scale(0.97);}
+  #signInBtn{background:#fff;color:#111;display:flex;align-items:center;gap:10px;}
+  #uploadBtn{background:linear-gradient(135deg,#d48fd4,#f0a0c0);color:#1a0a22;display:none;}
+  #log{background:#1a1428;border:1px solid #333;border-radius:12px;padding:16px;width:100%;max-width:500px;font-size:0.82rem;line-height:1.8;color:#aaa;max-height:300px;overflow-y:auto;display:none;}
+  .ok{color:#7dd3a0;} .err{color:#f07070;} .head{color:#d48fd4;font-weight:700;}
+</style>
+</head>
+<body>
+<h1>💃 Загрузка данных в студию</h1>
+<p>Войди через Google, затем нажми «Загрузить» — все месяцы из таблицы появятся в приложении.</p>
+<button id="signInBtn">
+  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.96 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+  Войти через Google
+</button>
+<button id="uploadBtn">🚀 Загрузить все данные</button>
+<div id="log"></div>
+
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyAe7BhoNaluYMKQgW_SMb2_tNVKadkgVJI",
+  authDomain:"tabel-f40c3.firebaseapp.com",
+  projectId:"tabel-f40c3",
+  storageBucket:"tabel-f40c3.firebasestorage.app",
+  messagingSenderId:"90528693206",
+  appId:"1:90528693206:web:2579f4a2e787b5f0344277"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+let uid = null;
+
+auth.onAuthStateChanged(u => {
+  if(u){ uid=u.uid; document.getElementById('signInBtn').style.display='none'; document.getElementById('uploadBtn').style.display=''; }
+  else { document.getElementById('signInBtn').style.display=''; document.getElementById('uploadBtn').style.display='none'; }
+});
+
+document.getElementById('signInBtn').onclick = () =>
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+
+// ─────────────────────────── SEED DATA ───────────────────────────
+// Helpers: build visits object from bool array and date-id array
+function mkVisits(bools, dateIds){
+  const v={};
+  bools.forEach((b,i)=>{ if(dateIds[i]) v[dateIds[i]]=!!b; });
+  return v;
+}
+function mkDates(isoArr){
+  const DAYS=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  return isoArr.map((d,i)=>{
+    const dt=new Date(d+'T00:00:00');
+    return {id:'d'+i, date:d, label:DAYS[dt.getDay()]};
+  });
+}
+function mkSubs(arr){ return arr.map(([name,amount],i)=>({id:'s'+i,name,amount,note:''})); }
+function mkVisitors(arr, dateIds){
+  return arr.map(([name,visits],i)=>({id:'v'+i, name, visits:mkVisits(visits,dateIds)}));
+}
+
+const SEED = {
+  'ХИЛС': {
+    '2025_07': {
+      subscriptions: mkSubs([['Перепелица Кира',1100],['Пустюльга Виолетта',1500],['Маша',1500]]),
+      oneTimePrice: 200,
+      trainingDates: mkDates(['2025-07-01','2025-07-03','2025-07-08','2025-07-10','2025-07-15','2025-07-17','2025-07-22','2025-07-24','2025-07-31']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Соня',            [1,1,1,1,0,1,1,1,0]],
+        ['Тищенко Кира',    [0,0,1,0,1,1,1,0,1]],
+        ['Маша',            [1,1,1,1,0,1,1,1,1]],
+        ['Горофонова Ева',  [0,0,0,0,0,0,1,0,0]],
+        ['Малкина Соня',    [0,0,0,0,0,0,1,0,0]],
+        ['Авдеева Виолетта',[0,0,0,0,0,0,0,1,0]],
+        ['Пустюльга Виолетта',[0,0,0,0,0,0,0,0,1]],
+      ],ids);}
+    },
+    '2025_08': {
+      subscriptions: mkSubs([['Перепелица Кира',1500],['Баровская Маша',1500],['Зражевская Аня',1200]]),
+      oneTimePrice: 200,
+      trainingDates: mkDates(['2025-08-05','2025-08-07','2025-08-12','2025-08-14','2025-08-19','2025-08-21','2025-08-26','2025-08-28']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Саша Шаповалова',   [1,0,0,0,0,0,0,0]],
+        ['Пустюльга Виолетта',[1,1,0,0,0,0,1,1]],
+        ['Зубенко Маша',      [1,1,1,0,1,1,0,0]],
+        ['Тищенко Кира',      [0,1,0,0,0,0,1,1]],
+        ['Зражевская Аня',    [0,1,0,0,0,0,0,0]],
+        ['Широва Наина',      [0,1,1,1,1,1,0,0]],
+        ['Ляховец Соня',      [0,0,1,1,0,1,1,1]],
+        ['Лысенко Соня',      [0,0,1,1,1,1,1,1]],
+        ['Павлова Вика',      [0,0,0,0,0,0,1,1]],
+      ],ids);}
+    },
+    '2025_09': {
+      subscriptions: mkSubs([['Полина',2500],['Аня',2500],['Ира',1400],['Настя',1400],['Жанна',1000],['Лера',1600]]),
+      oneTimePrice: 400,
+      trainingDates: mkDates(['2025-09-02','2025-09-04','2025-09-09','2025-09-11','2025-09-16','2025-09-18','2025-09-23','2025-09-25','2025-09-30']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Марго',   [1,0,0,0,0,0,0,0,0]],
+        ['Лена',    [0,1,0,0,0,0,0,0,0]],
+        ['Кристина',[0,0,0,0,1,0,0,0,0]],
+        ['Ира',     [0,0,0,0,1,0,0,0,0]],
+      ],ids);}
+    },
+    '2025_10': {
+      subscriptions: mkSubs([['Лера',2500],['Жанна',2500],['Аня',2500],['Настя',2500],['Аня Нотич',2500],['Лиза',1400],['Ира',2500],['Лиза Островерх',1400],['Лиза Грицай',2500],['Руслана',2800],['Ліза',1400]]),
+      oneTimePrice: 400,
+      trainingDates: mkDates(['2025-10-07','2025-10-09','2025-10-14','2025-10-16','2025-10-21','2025-10-23','2025-10-28','2025-10-30']),
+      visitors: []
+    },
+    '2025_11': {
+      subscriptions: mkSubs([['Лера',1800],['Жанна',2500],['Аня Новикова',1800],['Настя Ковша',1800],['Аня Нотич',1800],['Лизуня',1800],['Ира',1600],['Аня Турция',2500],['Аня Гладнева',2500],['Глория',1600],['Аня Смирнова',600]]),
+      oneTimePrice: 400,
+      trainingDates: mkDates(['2025-11-04','2025-11-06','2025-11-11','2025-11-13','2025-11-18','2025-11-20','2025-11-22','2025-11-25','2025-11-27','2025-11-29']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Любовь',       [1,0,1,0,0,0,0,0,0,0]],
+        ['Аня',          [0,1,0,0,0,0,0,0,0,0]],
+        ['Аня от Леши',  [0,0,0,0,1,0,0,0,0,0]],
+        ['Настя',        [0,0,0,0,0,0,1,0,0,0]],
+      ],ids);}
+    },
+    '2025_12': {
+      subscriptions: mkSubs([['Лера',2500],['Ира',2500],['Лиза',1900],['Настя',1900],['Жанна',2500],['Аня Нотич',1400],['Аня Турция',400],['Аня Гав',1400],['Глория',1050],['Даша',1400]]),
+      oneTimePrice: 400,
+      trainingDates: mkDates(['2025-12-02','2025-12-04','2025-12-09','2025-12-11','2025-12-16','2025-12-18','2025-12-23','2025-12-25']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Дарья', [1,0,0,0,0,1,1,0]],
+        ['Любовь',[0,0,0,0,1,0,0,0]],
+      ],ids);}
+    },
+    '2026_01': {
+      subscriptions: mkSubs([['Аня Нотич',1400],['Руслана',1000],['Дарья Греф',1400],['Жанна',1400],['Аня Гладнева',1400],['Ира',1400],['Лера',1400],['Лиза Островерх',1400],['Даша',1900],['Глория',1400],['Настя Ковша',1400],['Юля',1400]]),
+      oneTimePrice: 400,
+      trainingDates: mkDates(['2026-01-06','2026-01-08','2026-01-13','2026-01-15','2026-01-20','2026-01-22','2026-01-27','2026-01-29']),
+      visitors: []
+    },
+    '2026_02': {
+      subscriptions: mkSubs([['Аня Нотич',2500],['Руслана',2500],['Дарья Греф',2500],['Жанна',2500],['Аня Гладнева',2500],['Ира',1900],['Лера',2500],['Даша',600],['Глория',1400]]),
+      oneTimePrice: 400,
+      trainingDates: mkDates(['2026-02-03','2026-02-05','2026-02-10','2026-02-12','2026-02-17','2026-02-19','2026-02-24','2026-02-26','2026-03-03']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Даша',[0,0,0,0,0,0,0,1,0]],
+      ],ids);}
+    },
+    '2026_03': {
+      subscriptions: mkSubs([['Аня Нотич',2600],['Жанна',2600],['Настя Ковша',1500],['Лера',2600],['Руслана',2600],['Аня',2600],['Настя Вакула',1000],['Ира',1500],['Елена',1500],['Даша Греф',1500],['Настя',350]]),
+      oneTimePrice: 420,
+      trainingDates: mkDates(['2026-03-03','2026-03-05','2026-03-10','2026-03-12','2026-03-17','2026-03-19','2026-03-24','2026-03-26','2026-03-31']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Даша',  [1,1,1,0,0,0,0,0,0]],
+        ['Дарья', [0,0,0,1,0,0,0,0,0]],
+        ['Ира',   [0,0,0,1,0,0,0,0,0]],
+      ],ids);}
+    },
+    '2026_04': {
+      subscriptions: mkSubs([['Руслана',2950],['Анна Гладнева',2000],['Аня Нотич',2950],['Жанна',2950],['Вероника Корниенко',1500],['Глория',2950],['Ира',1850],['Настя Вакула',1850],['Лера',2600],['Даша Греф',1500],['Настя Вакула 2',1500],['Лена',1500]]),
+      oneTimePrice: 420,
+      trainingDates: mkDates(['2026-04-02','2026-04-07','2026-04-09','2026-04-14','2026-04-16','2026-04-21','2026-04-23','2026-04-28','2026-05-05']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Даша',  [0,0,1,1,0,0,0,0,0]],
+        ['Настя', [0,0,0,0,0,0,0,1,1]],
+      ],ids);}
+    },
+    '2026_05': {
+      subscriptions: mkSubs([['Руслана',1600],['Анна Гладнева',2300],['Аня Нотич',2600],['Жанна',2600],['Глория',1600],['Настя Ковша',2600],['Олена',2600],['Юлия',2180]]),
+      oneTimePrice: 420,
+      trainingDates: mkDates(['2026-05-05','2026-05-07','2026-05-12','2026-05-14','2026-05-19','2026-05-21','2026-05-26','2026-05-28','2026-06-02']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Юлия',[1,0,0,0,0,0,0,0,0]],
+      ],ids);}
+    },
+  },
+
+  'Новые': {
+    '2025_11': {
+      subscriptions: mkSubs([['Настя педиатр',1800],['Настя',1800],['Влада',1800],['Любові',1000]]),
+      oneTimePrice: 300,
+      trainingDates: mkDates(['2025-11-04','2025-11-06','2025-11-11','2025-11-13','2025-11-18','2025-11-20','2025-11-25','2025-11-27','2025-12-02','2025-12-04']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Оксана',[0,1,0,0,0,0,0,0,0,0]],
+        ['Софія', [0,0,0,0,1,0,0,1,0,0]],
+        ['Ира',   [0,0,0,0,0,0,1,1,0,0]],
+      ],ids);}
+    },
+    '2025_12': {
+      subscriptions: mkSubs([['Ира',1000],['Настя',1000],['Влада',1800],['Любовь',1000],['София',1000]]),
+      oneTimePrice: 300,
+      trainingDates: mkDates(['2025-12-02','2025-12-04','2025-12-09','2025-12-11','2025-12-16','2025-12-18','2025-12-23','2025-12-25']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Ира',   [0,0,0,0,1,1,1,1]],
+        ['Люба',  [0,0,0,0,0,0,1,1]],
+        ['Настя', [0,0,0,0,0,0,1,1]],
+        ['София', [0,0,0,0,0,0,1,0]],
+      ],ids);}
+    },
+    '2026_01': {
+      subscriptions: mkSubs([['Настя Сол',1000],['Влада',1000],['Люба',1000],['Софія',1000],['Оля',700],['Ира',700],['Анна',700]]),
+      oneTimePrice: 300,
+      trainingDates: mkDates(['2026-01-06','2026-01-08','2026-01-13','2026-01-15','2026-01-20','2026-01-22','2026-01-27','2026-01-29']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Аня',      [0,0,0,0,0,1,0,0]],
+        ['Оля',      [0,0,0,0,1,0,0,0]],
+        ['Вероніка', [0,0,0,0,0,0,0,1]],
+        ['Марина',   [0,0,0,0,0,0,0,1]],
+        ['Юля',      [0,0,0,0,0,0,1,0]],
+        ['Лиана',    [0,0,0,0,0,0,1,0]],
+        ['Анна',     [0,0,0,0,0,0,1,0]],
+      ],ids);}
+    },
+    '2026_02': {
+      subscriptions: mkSubs([['Ира',1900],['Люба',1900],['Оля Богдановська',1000],['Анна Бондаренко',1900],['Юля',1000],['Ната',700],['Надин',700]]),
+      oneTimePrice: 300,
+      trainingDates: mkDates(['2026-02-03','2026-02-05','2026-02-10','2026-02-12','2026-02-17','2026-02-19','2026-02-24','2026-02-26']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Влада',          [0,1,0,0,0,0,0,0]],
+        ['Анна Гаража',    [0,0,0,1,0,0,0,0]],
+        ['Полина',         [0,0,1,0,0,0,0,0]],
+        ['Лиза',           [0,0,1,0,1,0,1,0]],
+        ['Аня',            [0,0,0,1,0,0,1,1]],
+        ['Вероніка',       [0,0,0,1,0,1,0,1]],
+        ['Наталия',        [0,0,0,0,1,1,0,0]],
+        ['Надин',          [0,0,0,0,1,0,0,0]],
+        ['Юля',            [0,0,0,0,1,0,0,0]],
+        ['Вера',           [0,0,0,0,1,0,0,0]],
+        ['Юля 2',          [0,0,0,0,0,1,1,1]],
+      ],ids);}
+    },
+    '2026_03': {
+      subscriptions: mkSubs([['Юлия Шевченко',1600],['Щурова Ира',2000],['Наталя Міротнік',2000],['Дідковська Вероніка',1600],['София Кит',1100],['Юлия Аргунова',2000],['Надя',1100],['Гаража Анна',2000],['Любов Дончак',1100],['Лиза',1100],['Влада',2000],['Катя Мирошник',800],['Анна Тупахина',1750],['Ирина психолог',1000]]),
+      oneTimePrice: 350,
+      trainingDates: mkDates(['2026-03-03','2026-03-05','2026-03-10','2026-03-12','2026-03-17','2026-03-19','2026-03-24','2026-03-26']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Анна Тупахина',   [1,0,0,0,0,0,0,0]],
+        ['Анна Писаненко',  [1,0,0,0,0,0,0,0]],
+        ['Юлия без рук',    [1,0,1,0,1,0,0,0]],
+        ['Мирошник Катя',   [1,0,0,0,0,0,0,0]],
+        ['Ира',             [1,0,0,0,0,0,0,0]],
+        ['Анна Бондаренко', [1,0,1,0,0,0,0,1]],
+        ['Дарья',           [1,0,0,0,0,0,0,0]],
+        ['Ирина',           [0,0,0,1,0,0,0,0]],
+        ['Дарья подруга',   [0,0,0,0,1,0,0,1]],
+        ['Дарья Гуменюк',   [0,0,0,0,0,0,0,1]],
+      ],ids);}
+    },
+    '2026_04': {
+      subscriptions: mkSubs([['Юлия Шевченко',2000],['Наталия',1600],['Аргунова Юлия',2000],['Аня Тупахина',2000],['Любовь',1100],['Анна Гаража',2000],['Вероніка Дідковська',2000],['Анна Бондаренко',2000]]),
+      oneTimePrice: 350,
+      trainingDates: mkDates(['2026-04-02','2026-04-07','2026-04-09','2026-04-14','2026-04-16','2026-04-21','2026-04-23','2026-04-28','2026-05-05']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Катерина',[0,0,1,0,0,0,0,0,0]],
+        ['Лиза',   [0,0,0,0,0,0,0,0,1]],
+      ],ids);}
+    },
+    '2026_05': {
+      subscriptions: mkSubs([['Юлия Шевченко',1600],['Анастасия',1100],['Аргунова Юлия',2000],['Аня Тупахина',2000],['Любовь',1600],['Анна Гаража',2000],['Вероніка Дідковська',2000],['Анна Кравец',1700],['Влада',1100]]),
+      oneTimePrice: 350,
+      trainingDates: mkDates(['2026-05-05','2026-05-07','2026-05-12','2026-05-14','2026-05-19','2026-05-21','2026-05-26','2026-05-28','2026-06-02']),
+      get visitors(){ const ids=this.trainingDates.map(d=>d.id); return mkVisitors([
+        ['Аня Бондаренко',[1,0,0,0,0,0,0,0,0]],
+        ['Анна Кравец',   [1,0,0,0,0,0,0,0,0]],
+      ],ids);}
+    },
+  }
+};
+
+// ─────────────────────── UPLOAD ───────────────────────
+const logEl = document.getElementById('log');
+function log(msg, cls=''){
+  logEl.style.display='';
+  const div=document.createElement('div');
+  div.className=cls;
+  div.innerHTML=msg;
+  logEl.appendChild(div);
+  logEl.scrollTop=logEl.scrollHeight;
+}
+
+document.getElementById('uploadBtn').onclick = async () => {
+  if(!uid){ alert('Войди через Google'); return; }
+  document.getElementById('uploadBtn').disabled=true;
+  log('Начинаем загрузку...','head');
+
+  const userRef = db.collection('dance_users').doc(uid);
+  const groupsRef = userRef.collection('groups');
+  const monthsRef = userRef.collection('months');
+
+  // Create groups
+  const groupIds = {};
+  for(const groupName of Object.keys(SEED)){
+    const color = groupName==='ХИЛС' ? '#d48fd4' : '#f0a0c0';
+    const ref = await groupsRef.add({ name: groupName, color, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    groupIds[groupName] = ref.id;
+    log(`✓ Группа "${groupName}" создана`, 'ok');
+  }
+
+  // Upload months
+  for(const [groupName, months] of Object.entries(SEED)){
+    const gid = groupIds[groupName];
+    for(const [periodKey, data] of Object.entries(months)){
+      const docKey = `${gid}_${periodKey}`;
+      const [yr,mo] = periodKey.split('_');
+      await monthsRef.doc(docKey).set({
+        subscriptions: data.subscriptions,
+        trainingDates: data.trainingDates,
+        oneTimePrice:  data.oneTimePrice,
+        oneTimeVisitors: data.visitors,
+        trainer1Pct: 60,
+        trainer2Pct: 40,
+        rent: 0,
+        otherExp: 0,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      const subSum = data.subscriptions.reduce((s,r)=>s+r.amount,0);
+      const oneSum = data.visitors.reduce((s,v)=>{
+        const cnt = Object.values(v.visits||{}).filter(Boolean).length;
+        return s + cnt * data.oneTimePrice;
+      },0);
+      const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+      const label = `${MONTHS[Number(mo)-1]} ${yr}`;
+      log(`✓ ${groupName} / ${label}: абон ${subSum}₴ + разовые ${oneSum}₴ = ${subSum+oneSum}₴`, 'ok');
+    }
+  }
+
+  log('','');
+  log('🎉 Все данные загружены! Можешь открывать приложение.','head');
+  document.getElementById('uploadBtn').textContent='✓ Готово!';
+};
+</script>
+</body>
+</html>
