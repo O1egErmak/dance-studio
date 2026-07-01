@@ -103,10 +103,6 @@ E.googleSignInBtn.addEventListener('click', () => {
 auth.getRedirectResult().catch(e => {
   if (e && e.code !== 'auth/no-auth-event') toast('Ошибка: '+e.message);
 });
-  }
-});
-
-
 
 E.signOutBtn.addEventListener('click', () => { cleanup(); auth.signOut(); });
 
