@@ -90,8 +90,23 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-E.googleSignInBtn.addEventListener('click', () =>
-  auth.signInWithPopup(googleProvider).catch(e => toast('Ошибка входа: '+e.message)));
+E.googleSignInBtn.addEventListener('click', () => {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (isMobile || isSafari) {
+    auth.signInWithRedirect(googleProvider).catch(e => toast('Ошибка входа: '+e.message));
+  } else {
+    auth.signInWithPopup(googleProvider).catch(e => toast('Ошибка входа: '+e.message));
+  }
+});
+
+auth.getRedirectResult().catch(e => {
+  if (e && e.code !== 'auth/no-auth-event') toast('Ошибка: '+e.message);
+});
+  }
+});
+
+
 
 E.signOutBtn.addEventListener('click', () => { cleanup(); auth.signOut(); });
 
