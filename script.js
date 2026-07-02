@@ -69,11 +69,54 @@ const E = {
   t1pct: $('t1pct'), t2pct: $('t2pct'),
   modalOverlay: $('modalOverlay'), modalTitle: $('modalTitle'),
   modalBody: $('modalBody'), modalCancel: $('modalCancel'),
-  modalConfirm: $('modalConfirm'), toast: $('toast')
+  modalConfirm: $('modalConfirm'), toast: $('toast'),
+  authLoading: $('authLoading'),
+  reportFromMonth: $('reportFromMonth'), reportFromYear: $('reportFromYear'),
+  reportToMonth: $('reportToMonth'), reportToYear: $('reportToYear'),
+  reportAllTime: $('reportAllTime'), reportBuildBtn: $('reportBuildBtn'),
+  reportEmpty: $('reportEmpty'), reportResults: $('reportResults'),
+  repSubTotal: $('repSubTotal'), repOneTime: $('repOneTime'), repTotal: $('repTotal'),
+  repExpenses: $('repExpenses'), repNet: $('repNet'), repT1: $('repT1'), repT2: $('repT2'),
+  reportMonthBody: $('reportMonthBody')
 };
 
 /* ======================== Auth ======================== */
+
+// Explicit persistence: some mobile browsers (in-app webviews, private mode)
+// don't reliably keep the default persistence across the redirect round-trip.
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.error('persistence', e));
+
+function showAuthLoading(msg){
+  if(!E.authLoading) return;
+  const p = E.authLoading.querySelector('p');
+  if(p) p.textContent = msg;
+  E.authLoading.hidden = false;
+}
+function hideAuthLoading(){
+  if(E.authLoading) E.authLoading.hidden = true;
+}
+
+// If we're mid-way through a mobile redirect login, show a spinner instead of
+// a blank/stuck screen while Firebase resolves the result.
+const redirectPending = sessionStorage.getItem('authRedirectPending') === '1';
+if (redirectPending) {
+  E.loginScreen.hidden = true;
+  showAuthLoading('Завершаем вход...');
+  // Safety net: if nothing resolves within 12s (blocked network, unauthorized
+  // domain, etc.) stop showing an endless spinner and tell the user.
+  setTimeout(() => {
+    if (!currentUser) {
+      sessionStorage.removeItem('authRedirectPending');
+      hideAuthLoading();
+      E.loginScreen.hidden = false;
+      toast('Не удалось завершить вход. Проверьте интернет и попробуйте снова.');
+    }
+  }, 12000);
+}
+
 auth.onAuthStateChanged(user => {
+  hideAuthLoading();
+  sessionStorage.removeItem('authRedirectPending');
   if (user) {
     currentUser = user;
     E.userAvatar.src = user.photoURL || '';
@@ -81,6 +124,7 @@ auth.onAuthStateChanged(user => {
     E.loginScreen.hidden = true;
     E.mainApp.hidden = false;
     buildMonthSelect();
+    buildReportSelects();
     loadGroups();
   } else {
     currentUser = null;
@@ -94,14 +138,26 @@ E.googleSignInBtn.addEventListener('click', () => {
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   if (isMobile || isSafari) {
-    auth.signInWithRedirect(googleProvider).catch(e => toast('Ошибка входа: '+e.message));
+    sessionStorage.setItem('authRedirectPending', '1');
+    showAuthLoading('Открываем вход через Google...');
+    auth.signInWithRedirect(googleProvider).catch(e => {
+      sessionStorage.removeItem('authRedirectPending');
+      hideAuthLoading();
+      toast('Ошибка входа: '+e.message);
+    });
   } else {
     auth.signInWithPopup(googleProvider).catch(e => toast('Ошибка входа: '+e.message));
   }
 });
 
-auth.getRedirectResult().catch(e => {
-  if (e && e.code !== 'auth/no-auth-event') toast('Ошибка: '+e.message);
+auth.getRedirectResult().then(result => {
+  sessionStorage.removeItem('authRedirectPending');
+  if (result && result.user) hideAuthLoading();
+}).catch(e => {
+  sessionStorage.removeItem('authRedirectPending');
+  hideAuthLoading();
+  E.loginScreen.hidden = false;
+  if (e && e.code !== 'auth/no-auth-event') toast('Ошибка входа: '+e.message);
 });
 
 E.signOutBtn.addEventListener('click', () => { cleanup(); auth.signOut(); });
@@ -135,14 +191,21 @@ function saveMonth(){
 /* ======================== Groups ======================== */
 function loadGroups(){
   if(groupsUnsub) groupsUnsub();
+  let loaded = false;
+  // If Firestore never responds (blocked network, offline, etc.) let the user
+  // know instead of leaving a silently empty screen.
+  setTimeout(() => {
+    if(!loaded) toast('Группы долго не загружаются. Проверьте интернет-соединение.');
+  }, 8000);
   groupsUnsub = groupsRef().orderBy('createdAt').onSnapshot(snap => {
+    loaded = true;
     groups = snap.docs.map(d => ({id:d.id, ...d.data()}));
     renderGroupList();
     if(currentGroupId && !groups.find(g=>g.id===currentGroupId)){
       currentGroupId = null;
       showNoGroup();
     }
-  }, e => toast('Ошибка загрузки групп: '+e.message));
+  }, e => { loaded = true; toast('Ошибка загрузки групп: '+e.message); });
 }
 
 function renderGroupList(){
@@ -166,6 +229,11 @@ function selectGroup(id){
   E.noGroup.hidden = true;
   E.groupView.hidden = false;
   subscribeMonth();
+
+  // Different group => previous period report no longer applies
+  E.reportResults.hidden = true;
+  E.reportEmpty.hidden = false;
+  E.reportEmpty.textContent = 'Выберите период и нажмите «Показать»';
 }
 
 function showNoGroup(){
@@ -542,6 +610,120 @@ function renderTrainerCalc(){
   E.resT2.textContent       = fmtUah(Math.round(net*t2pct/100));
   E.t1pct.textContent       = t1pct;
   E.t2pct.textContent       = t2pct;
+}
+
+/* ======================== Period report ======================== */
+function buildReportSelects(){
+  const opts = MONTHS.map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+  E.reportFromMonth.innerHTML = opts;
+  E.reportToMonth.innerHTML = opts;
+  const y = new Date().getFullYear();
+  E.reportFromMonth.value = 0;
+  E.reportFromYear.value = y;
+  E.reportToMonth.value = new Date().getMonth();
+  E.reportToYear.value = y;
+}
+
+E.reportAllTime.addEventListener('change', () => {
+  const disabled = E.reportAllTime.checked;
+  [E.reportFromMonth, E.reportFromYear, E.reportToMonth, E.reportToYear].forEach(el => el.disabled = disabled);
+});
+
+E.reportBuildBtn.addEventListener('click', runPeriodReport);
+
+async function runPeriodReport(){
+  if(!currentGroupId){ toast('Сначала выбери группу'); return; }
+
+  E.reportBuildBtn.disabled = true;
+  E.reportBuildBtn.textContent = 'Считаем...';
+
+  try{
+    // All month docs for this group have ids "<groupId>_YYYY_MM", so a range
+    // query on the document id prefix pulls every month in one request.
+    const prefix = `${currentGroupId}_`;
+    const snap = await userRef().collection('months')
+      .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
+      .where(firebase.firestore.FieldPath.documentId(), '<', prefix + '\uf8ff')
+      .get();
+
+    const allTime = E.reportAllTime.checked;
+    const fromKey = Number(E.reportFromYear.value)*12 + Number(E.reportFromMonth.value);
+    const toKey   = Number(E.reportToYear.value)*12 + Number(E.reportToMonth.value);
+
+    const rows = [];
+    snap.forEach(doc => {
+      const parts = doc.id.split('_'); // [groupId, year, month]
+      const year = Number(parts[1]);
+      const month = Number(parts[2]) - 1;
+      if(Number.isNaN(year) || Number.isNaN(month)) return;
+      const key = year*12 + month;
+      if(!allTime && (key < fromKey || key > toKey)) return;
+
+      const d = doc.data();
+      const subTotal = Array.isArray(d.subscriptions)
+        ? d.subscriptions.reduce((s,r)=>s+(Number(r.amount)||0),0) : 0;
+      const price = Number(d.oneTimePrice)||0;
+      const oneTimeTotal = Array.isArray(d.oneTimeVisitors)
+        ? d.oneTimeVisitors.reduce((s,v)=>{
+            const count = Object.values(v.visits||{}).filter(Boolean).length;
+            return s + count*price;
+          },0) : 0;
+      const total = subTotal + oneTimeTotal;
+      const rent = Number(d.rent)||0;
+      const other = Number(d.otherExp)||0;
+      const expenses = rent+other;
+      const net = Math.max(total-expenses,0);
+      const t1pct = Number(d.trainer1Pct)||0;
+      const t2pct = Number(d.trainer2Pct)||0;
+
+      rows.push({
+        year, month, subTotal, oneTimeTotal, total, expenses, net,
+        t1: Math.round(net*t1pct/100), t2: Math.round(net*t2pct/100)
+      });
+    });
+
+    rows.sort((a,b) => (a.year*12+a.month) - (b.year*12+b.month));
+    renderPeriodReport(rows);
+  } catch(e){
+    toast('Ошибка построения отчёта: '+e.message);
+  } finally {
+    E.reportBuildBtn.disabled = false;
+    E.reportBuildBtn.textContent = 'Показать';
+  }
+}
+
+function renderPeriodReport(rows){
+  if(rows.length===0){
+    E.reportResults.hidden = true;
+    E.reportEmpty.hidden = false;
+    E.reportEmpty.textContent = 'За выбранный период данных нет';
+    return;
+  }
+  E.reportEmpty.hidden = true;
+  E.reportResults.hidden = false;
+
+  const sum = key => rows.reduce((s,r)=>s+r[key],0);
+  const subTotal = sum('subTotal'), oneTimeTotal = sum('oneTimeTotal'),
+        total = sum('total'), expenses = sum('expenses'), net = sum('net'),
+        t1 = sum('t1'), t2 = sum('t2');
+
+  E.repSubTotal.textContent = fmtUah(subTotal);
+  E.repOneTime.textContent  = fmtUah(oneTimeTotal);
+  E.repTotal.textContent    = fmtUah(total);
+  E.repExpenses.textContent = fmtUah(expenses);
+  E.repNet.textContent      = fmtUah(net);
+  E.repT1.textContent       = fmtUah(t1);
+  E.repT2.textContent       = fmtUah(t2);
+
+  E.reportMonthBody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${MONTHS[r.month]} ${r.year}</td>
+      <td>${fmtUah(r.subTotal)}</td>
+      <td>${fmtUah(r.oneTimeTotal)}</td>
+      <td>${fmtUah(r.total)}</td>
+      <td>${fmtUah(r.net)}</td>
+    </tr>
+  `).join('');
 }
 
 /* ======================== Tabs ======================== */
