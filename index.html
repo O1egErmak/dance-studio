@@ -26,6 +26,12 @@
   </div>
 </div>
 
+<!-- Auth loading (shown while resolving mobile redirect login) -->
+<div id="authLoading" class="auth-loading" hidden>
+  <div class="spinner"></div>
+  <p>Завершаем вход...</p>
+</div>
+
 <!-- Main App -->
 <div id="mainApp" class="app" hidden>
 
@@ -101,6 +107,7 @@
         <button class="tab active" data-tab="subscriptions">📋 Абонементы</button>
         <button class="tab" data-tab="attendance">✅ Разовые / явка</button>
         <button class="tab" data-tab="settings">⚙️ Настройки месяца</button>
+        <button class="tab" data-tab="period">📊 Общий заработок</button>
       </div>
 
       <!-- Tab: Subscriptions -->
@@ -196,6 +203,81 @@
             <span>Тренер 2 (<span id="t2pct">40</span>%)</span>
             <strong id="resT2">0 ₴</strong>
           </div>
+        </div>
+      </div>
+
+      <!-- Tab: Period report -->
+      <div id="tab-period" class="tab-panel panel glass">
+        <div class="panel-header">
+          <h2>Заработок за период</h2>
+        </div>
+
+        <div class="period-report-controls">
+          <label class="field">
+            <span>С</span>
+            <div class="period-report-range">
+              <select id="reportFromMonth"></select>
+              <input type="number" id="reportFromYear" min="2020" max="2100">
+            </div>
+          </label>
+          <label class="field">
+            <span>По</span>
+            <div class="period-report-range">
+              <select id="reportToMonth"></select>
+              <input type="number" id="reportToYear" min="2020" max="2100">
+            </div>
+          </label>
+          <label class="field-inline period-report-all">
+            <input type="checkbox" id="reportAllTime">
+            <span>За всё время</span>
+          </label>
+          <button id="reportBuildBtn" class="btn btn-primary">Показать</button>
+        </div>
+
+        <p id="reportEmpty" class="empty-hint">Выберите период и нажмите «Показать»</p>
+
+        <div id="reportResults" hidden>
+          <div class="stats-row">
+            <div class="stat-card glass">
+              <span class="stat-label">Сумма абон за период</span>
+              <span class="stat-value" id="repSubTotal">0 ₴</span>
+            </div>
+            <div class="stat-card glass">
+              <span class="stat-label">Разовые за период</span>
+              <span class="stat-value" id="repOneTime">0 ₴</span>
+            </div>
+            <div class="stat-card glass highlight">
+              <span class="stat-label">Общий доход за период</span>
+              <span class="stat-value" id="repTotal">0 ₴</span>
+            </div>
+          </div>
+
+          <div class="trainer-result glass" style="margin-top:16px;">
+            <div class="trainer-row">
+              <span>Расходы за период (аренда + прочее)</span>
+              <strong id="repExpenses">0 ₴</strong>
+            </div>
+            <div class="trainer-row">
+              <span>Чистый доход за период</span>
+              <strong id="repNet">0 ₴</strong>
+            </div>
+            <div class="trainer-row accent">
+              <span>Тренер 1 (сумма по месяцам)</span>
+              <strong id="repT1">0 ₴</strong>
+            </div>
+            <div class="trainer-row accent2">
+              <span>Тренер 2 (сумма по месяцам)</span>
+              <strong id="repT2">0 ₴</strong>
+            </div>
+          </div>
+
+          <h3 class="period-report-subheading">По месяцам</h3>
+          <table class="data-table" id="reportMonthTable">
+            <thead>
+              <tr><th>Месяц</th><th>Абон, ₴</th><th>Разовые, ₴</th><th>Итого, ₴</th><th>Чистыми, ₴</th></tr>
+            </thead>
+            <tbody id="reportMonthBody"></tbody>
+          </table>
         </div>
       </div>
 
