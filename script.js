@@ -51,6 +51,13 @@ const E = {
   googleSignInBtn: $('googleSignInBtn'), signOutBtn: $('signOutBtn'),
   userAvatar: $('userAvatar'), userName: $('userName'),
   groupList: $('groupList'), addGroupBtn: $('addGroupBtn'),
+  allGroupsBtn: $('allGroupsBtn'), allGroupsView: $('allGroupsView'),
+  agFromMonth: $('agFromMonth'), agFromYear: $('agFromYear'),
+  agToMonth: $('agToMonth'), agToYear: $('agToYear'),
+  agAllTime: $('agAllTime'), agBuildBtn: $('agBuildBtn'),
+  agEmpty: $('agEmpty'), agResults: $('agResults'),
+  agSubTotal: $('agSubTotal'), agOneTime: $('agOneTime'), agTotal: $('agTotal'),
+  agExpenses: $('agExpenses'), agNet: $('agNet'), agGroupBody: $('agGroupBody'),
   noGroup: $('noGroup'), groupView: $('groupView'),
   groupTitle: $('groupTitle'),
   monthSelect: $('monthSelect'), yearInput: $('yearInput'),
@@ -136,6 +143,7 @@ auth.onAuthStateChanged(user => {
     E.mainApp.hidden = false;
     buildMonthSelect();
     buildReportSelects();
+    buildAllGroupsSelects();
     loadGroups();
   } else {
     currentUser = null;
@@ -237,6 +245,8 @@ function selectGroup(id){
   const g = groups.find(x=>x.id===id);
   if(!g) return;
   E.groupTitle.textContent = g.name;
+  E.allGroupsView.hidden = true;
+  E.allGroupsBtn.classList.remove('active');
   E.noGroup.hidden = true;
   E.groupView.hidden = false;
   subscribeMonth();
@@ -248,9 +258,22 @@ function selectGroup(id){
 }
 
 function showNoGroup(){
+  E.allGroupsView.hidden = true;
+  E.allGroupsBtn.classList.remove('active');
   E.groupView.hidden = true;
   E.noGroup.hidden = false;
 }
+
+function showAllGroupsView(){
+  currentGroupId = null;
+  renderGroupList();
+  E.noGroup.hidden = true;
+  E.groupView.hidden = true;
+  E.allGroupsView.hidden = false;
+  E.allGroupsBtn.classList.add('active');
+}
+
+E.allGroupsBtn.addEventListener('click', showAllGroupsView);
 
 /* ======================== Add/rename/delete group ======================== */
 E.addGroupBtn.addEventListener('click', () => {
@@ -422,11 +445,34 @@ E.addDateBtn.addEventListener('click', () => {
 });
 
 function renderAttendance(){
+  try{
+    renderAttendanceInner();
+  } catch(err){
+    console.error('renderAttendance failed', err);
+    E.attEmpty.hidden = false;
+    E.attEmpty.textContent = 'Не получилось отрисовать таблицу разовых посещений. Обновите страницу; если не поможет — напишите разработчику.';
+    E.attendanceTable.innerHTML = '';
+    toast('Ошибка отображения разовых посещений');
+  }
+}
+
+function renderAttendanceInner(){
+  // Defensive: drop any malformed visitor records (e.g. old/corrupted data)
+  // instead of letting them crash the whole render.
+  monthData.oneTimeVisitors = (monthData.oneTimeVisitors||[]).filter(v => v && typeof v === 'object');
+  monthData.oneTimeVisitors.forEach(v => {
+    if(!v.id) v.id = uid();
+    if(typeof v.name !== 'string') v.name = '';
+    if(!v.visits || typeof v.visits !== 'object') v.visits = {};
+  });
+  monthData.trainingDates = (monthData.trainingDates||[]).filter(d => d && typeof d === 'object' && d.date);
+
   const dates = monthData.trainingDates;
   const visitors = monthData.oneTimeVisitors;
 
   if(dates.length===0 && visitors.length===0){
     E.attEmpty.hidden = false;
+    E.attEmpty.textContent = 'Добавьте даты тренировок и учениц-разовиков';
     E.attendanceTable.innerHTML = '';
     return;
   }
@@ -654,6 +700,115 @@ function buildReportSelects(){
   E.reportFromYear.value = y;
   E.reportToMonth.value = new Date().getMonth();
   E.reportToYear.value = y;
+}
+
+function buildAllGroupsSelects(){
+  const opts = MONTHS.map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+  E.agFromMonth.innerHTML = opts;
+  E.agToMonth.innerHTML = opts;
+  const y = new Date().getFullYear();
+  E.agFromMonth.value = 0;
+  E.agFromYear.value = y;
+  E.agToMonth.value = new Date().getMonth();
+  E.agToYear.value = y;
+}
+
+E.agAllTime.addEventListener('change', () => {
+  const disabled = E.agAllTime.checked;
+  [E.agFromMonth, E.agFromYear, E.agToMonth, E.agToYear].forEach(el => el.disabled = disabled);
+});
+
+E.agBuildBtn.addEventListener('click', runAllGroupsReport);
+
+async function runAllGroupsReport(){
+  E.agBuildBtn.disabled = true;
+  E.agBuildBtn.textContent = 'Считаем...';
+
+  try{
+    // Every month doc across every group lives in the same "months"
+    // collection with id "<groupId>_YYYY_MM" — pull the whole collection
+    // once and bucket it in memory instead of querying per group.
+    const snap = await userRef().collection('months').get();
+
+    const allTime = E.agAllTime.checked;
+    const fromKey = Number(E.agFromYear.value)*12 + Number(E.agFromMonth.value);
+    const toKey   = Number(E.agToYear.value)*12 + Number(E.agToMonth.value);
+
+    const byGroup = {}; // groupId -> {name, subTotal, oneTimeTotal, total, expenses, net}
+
+    snap.forEach(doc => {
+      const parts = doc.id.split('_'); // [groupId, year, month]
+      if(parts.length !== 3) return;
+      const groupId = parts[0];
+      const year = Number(parts[1]);
+      const month = Number(parts[2]) - 1;
+      if(Number.isNaN(year) || Number.isNaN(month)) return;
+      const key = year*12 + month;
+      if(!allTime && (key < fromKey || key > toKey)) return;
+
+      const d = doc.data();
+      const subTotal = Array.isArray(d.subscriptions)
+        ? d.subscriptions.reduce((s,r)=>s+(Number(r.amount)||0),0) : 0;
+      const price = Number(d.oneTimePrice)||0;
+      const oneTimeTotal = Array.isArray(d.oneTimeVisitors)
+        ? d.oneTimeVisitors.reduce((s,v)=>{
+            const count = Object.values(v && v.visits || {}).filter(Boolean).length;
+            return s + count*price;
+          },0) : 0;
+      const total = subTotal + oneTimeTotal;
+      const rent = Number(d.rent)||0;
+      const other = Number(d.otherExp)||0;
+      const expenses = rent+other;
+      const net = Math.max(total-expenses,0);
+
+      if(!byGroup[groupId]){
+        const g = groups.find(x=>x.id===groupId);
+        byGroup[groupId] = { name: g ? g.name : 'Удалённая группа', subTotal:0, oneTimeTotal:0, total:0, expenses:0, net:0 };
+      }
+      const b = byGroup[groupId];
+      b.subTotal += subTotal; b.oneTimeTotal += oneTimeTotal; b.total += total;
+      b.expenses += expenses; b.net += net;
+    });
+
+    renderAllGroupsReport(byGroup);
+  } catch(e){
+    toast('Ошибка построения общего отчёта: '+e.message);
+  } finally {
+    E.agBuildBtn.disabled = false;
+    E.agBuildBtn.textContent = 'Показать';
+  }
+}
+
+function renderAllGroupsReport(byGroup){
+  const rows = Object.values(byGroup);
+  if(rows.length===0){
+    E.agResults.hidden = true;
+    E.agEmpty.hidden = false;
+    E.agEmpty.textContent = 'За выбранный период данных нет';
+    return;
+  }
+  E.agEmpty.hidden = true;
+  E.agResults.hidden = false;
+
+  const sum = key => rows.reduce((s,r)=>s+r[key],0);
+  const subTotal = sum('subTotal'), oneTimeTotal = sum('oneTimeTotal'),
+        total = sum('total'), expenses = sum('expenses'), net = sum('net');
+
+  E.agSubTotal.textContent = fmtUah(subTotal);
+  E.agOneTime.textContent  = fmtUah(oneTimeTotal);
+  E.agTotal.textContent    = fmtUah(total);
+  E.agExpenses.textContent = fmtUah(expenses);
+  E.agNet.textContent      = fmtUah(net);
+
+  rows.sort((a,b)=>b.net-a.net);
+  E.agGroupBody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${escHtml(r.name)}</td>
+      <td>${fmtUah(r.total)}</td>
+      <td>${fmtUah(r.expenses)}</td>
+      <td>${fmtUah(r.net)}</td>
+    </tr>
+  `).join('');
 }
 
 E.reportAllTime.addEventListener('change', () => {
