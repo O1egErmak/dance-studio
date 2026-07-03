@@ -195,7 +195,9 @@ body{
   padding:28px 28px 60px;
   display:flex;flex-direction:column;gap:20px;
   min-height:100vh;
+  min-width:0; /* prevent wide nowrap content deep inside from ballooning this grid track */
 }
+.main > div{min-width:0;}
 
 .empty-screen{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
