@@ -47,6 +47,10 @@
       <button id="addGroupBtn" class="btn-add-group">+ Добавить группу</button>
     </div>
 
+    <div class="sidebar-section">
+      <button id="allGroupsBtn" class="btn-add-group" style="border-style:solid;">📊 Общий итог по всем</button>
+    </div>
+
     <div class="sidebar-bottom">
       <img id="userAvatar" src="" alt="" class="avatar">
       <span id="userName" class="user-name"></span>
@@ -61,6 +65,77 @@
       <div class="empty-icon">💃</div>
       <h2>Выбери группу слева</h2>
       <p>или создай новую нажав "+ Добавить группу"</p>
+    </div>
+
+    <!-- All groups combined report -->
+    <div id="allGroupsView" hidden>
+      <header class="main-header">
+        <div class="header-left">
+          <h1>Общий заработок — все группы</h1>
+        </div>
+      </header>
+
+      <div class="panel glass">
+        <div class="period-report-controls">
+          <label class="field">
+            <span>С</span>
+            <div class="period-report-range">
+              <select id="agFromMonth"></select>
+              <input type="number" id="agFromYear" min="2020" max="2100">
+            </div>
+          </label>
+          <label class="field">
+            <span>По</span>
+            <div class="period-report-range">
+              <select id="agToMonth"></select>
+              <input type="number" id="agToYear" min="2020" max="2100">
+            </div>
+          </label>
+          <label class="field-inline period-report-all">
+            <input type="checkbox" id="agAllTime">
+            <span>За всё время</span>
+          </label>
+          <button id="agBuildBtn" class="btn btn-primary">Показать</button>
+        </div>
+
+        <p id="agEmpty" class="empty-hint">Выберите период и нажмите «Показать»</p>
+
+        <div id="agResults" hidden>
+          <div class="stats-row">
+            <div class="stat-card glass">
+              <span class="stat-label">Сумма абон за период</span>
+              <span class="stat-value" id="agSubTotal">0 ₴</span>
+            </div>
+            <div class="stat-card glass">
+              <span class="stat-label">Разовые за период</span>
+              <span class="stat-value" id="agOneTime">0 ₴</span>
+            </div>
+            <div class="stat-card glass highlight">
+              <span class="stat-label">Общий доход за период</span>
+              <span class="stat-value" id="agTotal">0 ₴</span>
+            </div>
+          </div>
+
+          <div class="trainer-result glass" style="margin-top:16px;">
+            <div class="trainer-row">
+              <span>Расходы за период (аренда + прочее)</span>
+              <strong id="agExpenses">0 ₴</strong>
+            </div>
+            <div class="trainer-row">
+              <span>Чистый доход за период</span>
+              <strong id="agNet">0 ₴</strong>
+            </div>
+          </div>
+
+          <h3 class="period-report-subheading">По группам</h3>
+          <table class="data-table" id="agGroupTable">
+            <thead>
+              <tr><th>Группа</th><th>Доход</th><th>Расходы</th><th>Чистыми</th></tr>
+            </thead>
+            <tbody id="agGroupBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- Group view -->
