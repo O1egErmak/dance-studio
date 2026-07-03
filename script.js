@@ -187,7 +187,11 @@ function cleanup(){
 }
 
 /* ======================== Firestore helpers ======================== */
-function userRef(){ return db.collection('dance_users').doc(currentUser.uid); }
+// All data lives under one shared "household" document, regardless of which
+// of the allowed Google accounts is currently signed in (see Firestore rules
+// for the matching allow-list by email).
+const HOUSEHOLD_OWNER_UID = 'nwKYKEAb1GeWFUlMGtPWgaGgLp12';
+function userRef(){ return db.collection('dance_users').doc(HOUSEHOLD_OWNER_UID); }
 function groupsRef(){ return userRef().collection('groups'); }
 function monthRef(){
   const key = `${currentGroupId}_${currentYear}_${pad(currentMonth+1)}`;
