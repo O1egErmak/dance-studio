@@ -68,7 +68,7 @@ const E = {
   subscriptionBody: $('subscriptionBody'),
   subTotalFooter: $('subTotalFooter'), subEmpty: $('subEmpty'),
   addStudentBtn: $('addStudentBtn'),
-  priceInput: $('priceInput'), addDateBtn: $('addDateBtn'),
+  priceInput: $('priceInput'), addDateBtn: $('addDateBtn'), fillTueThuBtn: $('fillTueThuBtn'),
   attendanceWrap: $('attendanceWrap'), attEmpty: $('attEmpty'),
   attendanceTable: $('attendanceTable'),
   trainer1Pct: $('trainer1Pct'), trainer2Pct: $('trainer2Pct'),
@@ -380,6 +380,19 @@ function onPeriodChange(){
 }
 
 /* ======================== Month data ======================== */
+function generateWeekdayDates(year, month /* 0-indexed */, weekdays /* e.g. [2,4] */){
+  const result = [];
+  const d = new Date(year, month, 1);
+  while(d.getMonth() === month){
+    if(weekdays.includes(d.getDay())){
+      const iso = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      result.push({ id: uid(), date: iso, label: DAYS[d.getDay()] });
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return result;
+}
+
 function subscribeMonth(){
   if(monthUnsub){ monthUnsub(); monthUnsub=null; }
   monthRef().onSnapshot(snap => {
@@ -397,13 +410,18 @@ function subscribeMonth(){
         rentPerDay:      Number(d.rentPerDay)    || 0,
         otherExp:        Number(d.otherExp)      || 0
       };
+      syncInputsFromData();
+      renderAll();
     } else {
-      monthData = { subscriptions:[], trainingDates:[], oneTimePrice:300,
-                    oneTimeVisitors:[], trainer1Pct:100, trainer2Pct:0, rent:0,
+      // Brand-new month: pre-fill Tuesdays/Thursdays automatically so you
+      // only have to type names and tick boxes, not add every date by hand.
+      monthData = { subscriptions:[], trainingDates: generateWeekdayDates(currentYear, currentMonth, [2,4]),
+                    oneTimePrice:300, oneTimeVisitors:[], trainer1Pct:100, trainer2Pct:0, rent:0,
                     rentWorkDays:0, rentPerDay:0, otherExp:0 };
+      syncInputsFromData();
+      renderAll();
+      scheduleSave();
     }
-    syncInputsFromData();
-    renderAll();
   }, e => toast('Ошибка загрузки месяца: '+e.message));
 }
 
@@ -489,6 +507,17 @@ E.addDateBtn.addEventListener('click', () => {
       monthData.trainingDates.sort((a,b)=>a.date.localeCompare(b.date));
       renderAttendance(); scheduleSave();
     });
+});
+
+E.fillTueThuBtn.addEventListener('click', () => {
+  const generated = generateWeekdayDates(currentYear, currentMonth, [2,4]);
+  const existingDates = new Set(monthData.trainingDates.map(x=>x.date));
+  const toAdd = generated.filter(x=>!existingDates.has(x.date));
+  if(toAdd.length===0){ toast('Все вторники и четверги этого месяца уже добавлены'); return; }
+  monthData.trainingDates.push(...toAdd);
+  monthData.trainingDates.sort((a,b)=>a.date.localeCompare(b.date));
+  renderAttendance(); scheduleSave();
+  toast(`Добавлено дат: ${toAdd.length}`);
 });
 
 function renderAttendance(){
