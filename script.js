@@ -843,7 +843,7 @@ function renderAllGroupsReport(byGroup){
 
   E.agSubTotal.textContent = fmtUah(subTotal);
   E.agOneTime.textContent  = fmtUah(oneTimeTotal);
-  E.agTotal.textContent    = fmtUah(total);
+  E.agTotal.textContent    = fmtUah(net);
   E.agExpenses.textContent = fmtUah(expenses);
   E.agNet.textContent      = fmtUah(net);
 
