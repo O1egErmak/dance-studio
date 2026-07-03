@@ -616,10 +616,13 @@ function calcTotals(){
 
 function renderStats(){
   const { subTotal, oneTimeTotal, total } = calcTotals();
+  const rent  = Number(monthData.rent)||0;
+  const other = Number(monthData.otherExp)||0;
+  const net = Math.max(total-rent-other, 0);
   E.statStudents.textContent = monthData.subscriptions.filter(s=>s.name).length;
   E.statSubTotal.textContent = fmtUah(subTotal);
   E.statOneTime.textContent  = fmtUah(oneTimeTotal);
-  E.statTotal.textContent    = fmtUah(total);
+  E.statTotal.textContent    = fmtUah(net);
   renderTrainerCalc();
 }
 
