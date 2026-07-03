@@ -191,7 +191,7 @@ body{
 
 /* ---- Main ---- */
 .main{
-  margin-left:var(--sidebar-w);
+  grid-column:2;
   padding:28px 28px 60px;
   display:flex;flex-direction:column;gap:20px;
   min-height:100vh;
