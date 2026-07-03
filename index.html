@@ -166,14 +166,22 @@
         <div class="settings-grid">
           <label class="field">
             <span>Процент тренера 1 (основной), %</span>
-            <input type="number" id="trainer1Pct" min="0" max="100" value="60" placeholder="60">
+            <input type="number" id="trainer1Pct" min="0" max="100" value="100" placeholder="100">
           </label>
           <label class="field">
             <span>Процент тренера 2, %</span>
-            <input type="number" id="trainer2Pct" min="0" max="100" value="40" placeholder="40">
+            <input type="number" id="trainer2Pct" min="0" max="100" value="0" placeholder="0">
           </label>
           <label class="field">
-            <span>Аренда зала, ₴</span>
+            <span>Рабочих дней в месяце</span>
+            <input type="number" id="rentWorkDays" min="0" step="1" placeholder="0">
+          </label>
+          <label class="field">
+            <span>Ставка аренды за день, ₴</span>
+            <input type="number" id="rentPerDay" min="0" step="50" placeholder="900">
+          </label>
+          <label class="field">
+            <span>Аренда зала, ₴ <span style="opacity:.6;font-weight:400;">(дни × ставка, можно поправить)</span></span>
             <input type="number" id="rentInput" min="0" placeholder="0">
           </label>
           <label class="field">
@@ -196,11 +204,11 @@
             <strong id="resNet">0 ₴</strong>
           </div>
           <div class="trainer-row accent">
-            <span>Тренер 1 (<span id="t1pct">60</span>%)</span>
+            <span>Тренер 1 (<span id="t1pct">100</span>%)</span>
             <strong id="resT1">0 ₴</strong>
           </div>
           <div class="trainer-row accent2">
-            <span>Тренер 2 (<span id="t2pct">40</span>%)</span>
+            <span>Тренер 2 (<span id="t2pct">0</span>%)</span>
             <strong id="resT2">0 ₴</strong>
           </div>
         </div>
