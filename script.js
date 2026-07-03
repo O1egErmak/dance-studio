@@ -98,7 +98,15 @@ function hideAuthLoading(){
 
 // If we're mid-way through a mobile redirect login, show a spinner instead of
 // a blank/stuck screen while Firebase resolves the result.
-const redirectPending = sessionStorage.getItem('authRedirectPending') === '1';
+// The flag stores a timestamp (not just '1') so a stale flag from an
+// interrupted/old redirect attempt can't get us stuck forever on reload.
+const REDIRECT_FLAG_MAX_AGE_MS = 60000; // treat anything older than this as stale
+const redirectStartedAt = Number(sessionStorage.getItem('authRedirectPending')) || 0;
+const redirectPending = redirectStartedAt > 0 && (Date.now() - redirectStartedAt) < REDIRECT_FLAG_MAX_AGE_MS;
+if (redirectStartedAt > 0 && !redirectPending) {
+  // Stale leftover flag from a previous session — clear it silently.
+  sessionStorage.removeItem('authRedirectPending');
+}
 if (redirectPending) {
   E.loginScreen.hidden = true;
   showAuthLoading('Завершаем вход...');
@@ -138,7 +146,7 @@ E.googleSignInBtn.addEventListener('click', () => {
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
   if (isMobile || isSafari) {
-    sessionStorage.setItem('authRedirectPending', '1');
+    sessionStorage.setItem('authRedirectPending', String(Date.now()));
     showAuthLoading('Открываем вход через Google...');
     auth.signInWithRedirect(googleProvider).catch(e => {
       sessionStorage.removeItem('authRedirectPending');
