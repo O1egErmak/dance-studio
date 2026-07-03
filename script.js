@@ -133,25 +133,48 @@ if (redirectPending) {
 }
 
 auth.onAuthStateChanged(user => {
-  hideAuthLoading();
-  sessionStorage.removeItem('authRedirectPending');
-  if (user) {
-    currentUser = user;
-    E.userAvatar.src = user.photoURL || '';
-    E.userName.textContent = (user.displayName||user.email||'').split(' ')[0];
-    E.loginScreen.hidden = true;
-    E.mainApp.hidden = false;
-    buildMonthSelect();
-    buildReportSelects();
-    buildAllGroupsSelects();
-    loadGroups();
-  } else {
-    currentUser = null;
-    cleanup();
-    E.loginScreen.hidden = false;
+  try{
+    hideAuthLoading();
+    sessionStorage.removeItem('authRedirectPending');
+    if (user) {
+      currentUser = user;
+      E.userAvatar.src = user.photoURL || '';
+      E.userName.textContent = (user.displayName||user.email||'').split(' ')[0];
+      E.loginScreen.hidden = true;
+      E.mainApp.hidden = false;
+      buildMonthSelect();
+      buildReportSelects();
+      buildAllGroupsSelects();
+      loadGroups();
+    } else {
+      currentUser = null;
+      cleanup();
+      E.loginScreen.hidden = false;
+      E.mainApp.hidden = true;
+    }
+  } catch(err){
+    // Never leave the screen blank: something above threw (Safari storage
+    // quirks after a popup sign-in are a known culprit) — fall back to a
+    // visible, retryable state instead of a silent black screen.
+    console.error('onAuthStateChanged handler failed', err);
     E.mainApp.hidden = true;
+    E.loginScreen.hidden = false;
+    hideAuthLoading();
+    toast('Что-то пошло не так после входа. Попробуйте ещё раз.');
   }
 });
+
+// Absolute last-resort safety net: if for any reason nothing became visible
+// shortly after load (login screen, loading spinner, or the app itself),
+// force the login screen back on instead of leaving a blank page.
+setTimeout(() => {
+  const nothingVisible = E.loginScreen.hidden && E.mainApp.hidden &&
+    (!E.authLoading || E.authLoading.hidden);
+  if (nothingVisible) {
+    console.warn('Nothing visible after load — forcing login screen as a fallback.');
+    E.loginScreen.hidden = false;
+  }
+}, 6000);
 
 E.googleSignInBtn.addEventListener('click', async () => {
   // Popups are more reliable than the redirect flow on GitHub Pages: some
