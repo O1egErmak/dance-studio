@@ -165,6 +165,10 @@ body{
   border-color:var(--accent);color:var(--accent);
   background:var(--accent-soft);
 }
+.btn-add-group.active{
+  background:var(--accent-soft);border-color:var(--accent);
+  color:var(--text-0);font-weight:600;
+}
 
 .sidebar-bottom{
   display:flex;align-items:center;gap:8px;
