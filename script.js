@@ -32,9 +32,11 @@ let monthData = {
   trainingDates: [],    // [{id,date,label}]
   oneTimePrice: 300,
   oneTimeVisitors: [],  // [{id,name,visits:{dateId:bool}}]
-  trainer1Pct: 60,
-  trainer2Pct: 40,
+  trainer1Pct: 100,
+  trainer2Pct: 0,
   rent: 0,
+  rentWorkDays: 0,
+  rentPerDay: 0,
   otherExp: 0
 };
 
@@ -63,6 +65,7 @@ const E = {
   attendanceWrap: $('attendanceWrap'), attEmpty: $('attEmpty'),
   attendanceTable: $('attendanceTable'),
   trainer1Pct: $('trainer1Pct'), trainer2Pct: $('trainer2Pct'),
+  rentWorkDays: $('rentWorkDays'), rentPerDay: $('rentPerDay'),
   rentInput: $('rentInput'), otherExpInput: $('otherExpInput'),
   resTotal: $('resTotal'), resExpenses: $('resExpenses'),
   resNet: $('resNet'), resT1: $('resT1'), resT2: $('resT2'),
@@ -317,14 +320,17 @@ function subscribeMonth(){
         trainingDates:   Array.isArray(d.trainingDates)   ? d.trainingDates   : [],
         oneTimePrice:    Number(d.oneTimePrice)  || 300,
         oneTimeVisitors: Array.isArray(d.oneTimeVisitors) ? d.oneTimeVisitors : [],
-        trainer1Pct:     Number(d.trainer1Pct)  || 60,
-        trainer2Pct:     Number(d.trainer2Pct)  || 40,
+        trainer1Pct:     d.trainer1Pct !== undefined ? Number(d.trainer1Pct) : 100,
+        trainer2Pct:     d.trainer2Pct !== undefined ? Number(d.trainer2Pct) : 0,
         rent:            Number(d.rent)          || 0,
+        rentWorkDays:    Number(d.rentWorkDays)  || 0,
+        rentPerDay:      Number(d.rentPerDay)    || 0,
         otherExp:        Number(d.otherExp)      || 0
       };
     } else {
       monthData = { subscriptions:[], trainingDates:[], oneTimePrice:300,
-                    oneTimeVisitors:[], trainer1Pct:60, trainer2Pct:40, rent:0, otherExp:0 };
+                    oneTimeVisitors:[], trainer1Pct:100, trainer2Pct:0, rent:0,
+                    rentWorkDays:0, rentPerDay:0, otherExp:0 };
     }
     syncInputsFromData();
     renderAll();
@@ -335,6 +341,8 @@ function syncInputsFromData(){
   E.priceInput.value   = monthData.oneTimePrice || '';
   E.trainer1Pct.value  = monthData.trainer1Pct;
   E.trainer2Pct.value  = monthData.trainer2Pct;
+  E.rentWorkDays.value = monthData.rentWorkDays || '';
+  E.rentPerDay.value   = monthData.rentPerDay || '';
   E.rentInput.value    = monthData.rent || '';
   E.otherExpInput.value= monthData.otherExp || '';
 }
@@ -578,6 +586,19 @@ E.priceInput.addEventListener('input', () => {
     monthData.trainer2Pct = Number(E.trainer2Pct.value)||0;
     monthData.rent        = Number(E.rentInput.value)||0;
     monthData.otherExp    = Number(E.otherExpInput.value)||0;
+    renderTrainerCalc(); scheduleSave();
+  });
+});
+
+// Rent calculator: work days x rate per day. Recomputes the "Аренда зала"
+// total whenever either of these two changes; the total itself stays a
+// normal editable field afterwards (you can still tweak it by hand).
+[E.rentWorkDays, E.rentPerDay].forEach(inp => {
+  inp.addEventListener('input', () => {
+    monthData.rentWorkDays = Number(E.rentWorkDays.value)||0;
+    monthData.rentPerDay   = Number(E.rentPerDay.value)||0;
+    monthData.rent = monthData.rentWorkDays * monthData.rentPerDay;
+    E.rentInput.value = monthData.rent || '';
     renderTrainerCalc(); scheduleSave();
   });
 });
