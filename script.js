@@ -177,36 +177,22 @@ setTimeout(() => {
 }, 6000);
 
 E.googleSignInBtn.addEventListener('click', async () => {
-  // Popups are more reliable than the redirect flow on GitHub Pages: some
-  // mobile browsers (Safari's cross-site tracking prevention especially)
-  // lose the session between leaving for Google and coming back, so the
-  // redirect silently "does nothing" and dumps you back on the login screen.
-  // Try a popup everywhere first; only fall back to redirect if the
-  // environment genuinely can't do popups (blocked, or an embedded webview
-  // that doesn't support them at all).
+  // Popup only. The redirect flow needs sessionStorage to survive a full
+  // navigation to accounts.google.com and back — Safari's cross-site storage
+  // partitioning breaks exactly that, throwing "missing initial state".
+  // A popup doesn't need that round trip, so it's the reliable option here.
   try {
     await auth.signInWithPopup(googleProvider);
   } catch (e) {
-    const needsRedirectFallback = [
-      'auth/popup-blocked',
-      'auth/operation-not-supported-in-this-environment'
-    ].includes(e.code);
     const userJustClosedIt = [
       'auth/popup-closed-by-user',
       'auth/cancelled-popup-request'
     ].includes(e.code);
+    if (userJustClosedIt) return;
 
-    if (needsRedirectFallback) {
-      sessionStorage.setItem('authRedirectPending', String(Date.now()));
-      showAuthLoading('Открываем вход через Google...');
-      try {
-        await auth.signInWithRedirect(googleProvider);
-      } catch (e2) {
-        sessionStorage.removeItem('authRedirectPending');
-        hideAuthLoading();
-        toast('Ошибка входа: '+e2.message);
-      }
-    } else if (!userJustClosedIt) {
+    if (e.code === 'auth/popup-blocked') {
+      toast('Браузер заблокировал всплывающее окно. Разрешите всплывающие окна для этого сайта в настройках браузера и нажмите «Войти» ещё раз.');
+    } else {
       toast('Ошибка входа: '+e.message);
     }
   }
