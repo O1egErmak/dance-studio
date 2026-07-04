@@ -245,14 +245,6 @@
         <div class="settings-layout">
         <div class="settings-grid">
           <label class="field">
-            <span>Процент тренера 1 (основной), %</span>
-            <input type="number" id="trainer1Pct" min="0" max="100" value="100" placeholder="100">
-          </label>
-          <label class="field">
-            <span>Процент тренера 2, %</span>
-            <input type="number" id="trainer2Pct" min="0" max="100" value="0" placeholder="0">
-          </label>
-          <label class="field">
             <span>Рабочих дней в месяце</span>
             <input type="number" id="rentWorkDays" min="0" step="1" placeholder="0">
           </label>
@@ -279,17 +271,9 @@
             <span>Расходы (аренда + прочее)</span>
             <strong id="resExpenses">0 ₴</strong>
           </div>
-          <div class="trainer-row">
-            <span>Чистый доход</span>
-            <strong id="resNet">0 ₴</strong>
-          </div>
           <div class="trainer-row accent">
-            <span>Тренер 1 (<span id="t1pct">100</span>%)</span>
-            <strong id="resT1">0 ₴</strong>
-          </div>
-          <div class="trainer-row accent2">
-            <span>Тренер 2 (<span id="t2pct">0</span>%)</span>
-            <strong id="resT2">0 ₴</strong>
+            <span>Чистый доход (тренеру)</span>
+            <strong id="resNet">0 ₴</strong>
           </div>
         </div>
         </div>
@@ -351,12 +335,8 @@
               <strong id="repNet">0 ₴</strong>
             </div>
             <div class="trainer-row accent">
-              <span>Тренер 1 (сумма по месяцам)</span>
+              <span>Тренеру (сумма по месяцам)</span>
               <strong id="repT1">0 ₴</strong>
-            </div>
-            <div class="trainer-row accent2">
-              <span>Тренер 2 (сумма по месяцам)</span>
-              <strong id="repT2">0 ₴</strong>
             </div>
           </div>
 
