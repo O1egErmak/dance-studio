@@ -51,6 +51,7 @@ const E = {
   googleSignInBtn: $('googleSignInBtn'), signOutBtn: $('signOutBtn'),
   userAvatar: $('userAvatar'), userName: $('userName'),
   groupList: $('groupList'), addGroupBtn: $('addGroupBtn'),
+  mobileMenuBtn: $('mobileMenuBtn'), sidebarBackdrop: $('sidebarBackdrop'),
   allGroupsBtn: $('allGroupsBtn'), allGroupsView: $('allGroupsView'),
   agFromMonth: $('agFromMonth'), agFromYear: $('agFromYear'),
   agToMonth: $('agToMonth'), agToYear: $('agToYear'),
@@ -255,9 +256,21 @@ function loadGroups(){
     renderGroupList();
     if(currentGroupId && !groups.find(g=>g.id===currentGroupId)){
       currentGroupId = null;
-      showNoGroup();
     }
-  }, e => { loaded = true; toast('Ошибка загрузки групп: '+e.message); });
+    // Nothing selected yet (fresh login, or the page just loaded): pick the
+    // first group automatically instead of leaving every screen hidden and
+    // waiting for a sidebar click — on mobile the sidebar starts off-screen,
+    // so that click may never be reachable.
+    if(!currentGroupId){
+      if(groups.length > 0) selectGroup(groups[0].id);
+      else showNoGroup();
+    }
+  }, e => {
+    loaded = true;
+    toast('Ошибка загрузки групп: '+e.message);
+    // Never leave every screen hidden — show *something* retryable.
+    if(!currentGroupId) showNoGroup();
+  });
 }
 
 function renderGroupList(){
@@ -272,11 +285,23 @@ function renderGroupList(){
   });
 }
 
+function openSidebar(){
+  document.querySelector('.sidebar').classList.add('open');
+  E.sidebarBackdrop.classList.add('open');
+}
+function closeSidebar(){
+  document.querySelector('.sidebar').classList.remove('open');
+  E.sidebarBackdrop.classList.remove('open');
+}
+E.mobileMenuBtn.addEventListener('click', openSidebar);
+E.sidebarBackdrop.addEventListener('click', closeSidebar);
+
 function selectGroup(id){
   currentGroupId = id;
   renderGroupList();
   const g = groups.find(x=>x.id===id);
   if(!g) return;
+  closeSidebar();
   E.groupTitle.textContent = g.name;
   E.allGroupsView.hidden = true;
   E.allGroupsBtn.classList.remove('active');
@@ -300,6 +325,7 @@ function showNoGroup(){
 function showAllGroupsView(){
   currentGroupId = null;
   renderGroupList();
+  closeSidebar();
   E.noGroup.hidden = true;
   E.groupView.hidden = true;
   E.allGroupsView.hidden = false;
