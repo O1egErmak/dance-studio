@@ -32,8 +32,6 @@ let monthData = {
   trainingDates: [],    // [{id,date,label}]
   oneTimePrice: 300,
   oneTimeVisitors: [],  // [{id,name,visits:{dateId:bool}}]
-  trainer1Pct: 100,
-  trainer2Pct: 0,
   rent: 0,
   rentWorkDays: 0,
   rentPerDay: 0,
@@ -72,12 +70,10 @@ const E = {
   priceInput: $('priceInput'), addDateBtn: $('addDateBtn'), fillTueThuBtn: $('fillTueThuBtn'),
   attendanceWrap: $('attendanceWrap'), attEmpty: $('attEmpty'),
   attendanceTable: $('attendanceTable'),
-  trainer1Pct: $('trainer1Pct'), trainer2Pct: $('trainer2Pct'),
   rentWorkDays: $('rentWorkDays'), rentPerDay: $('rentPerDay'),
   rentInput: $('rentInput'), otherExpInput: $('otherExpInput'),
   resTotal: $('resTotal'), resExpenses: $('resExpenses'),
-  resNet: $('resNet'), resT1: $('resT1'), resT2: $('resT2'),
-  t1pct: $('t1pct'), t2pct: $('t2pct'),
+  resNet: $('resNet'),
   modalOverlay: $('modalOverlay'), modalTitle: $('modalTitle'),
   modalBody: $('modalBody'), modalCancel: $('modalCancel'),
   modalConfirm: $('modalConfirm'), toast: $('toast'),
@@ -87,7 +83,7 @@ const E = {
   reportAllTime: $('reportAllTime'), reportBuildBtn: $('reportBuildBtn'),
   reportEmpty: $('reportEmpty'), reportResults: $('reportResults'),
   repSubTotal: $('repSubTotal'), repOneTime: $('repOneTime'), repTotal: $('repTotal'),
-  repExpenses: $('repExpenses'), repNet: $('repNet'), repT1: $('repT1'), repT2: $('repT2'),
+  repExpenses: $('repExpenses'), repNet: $('repNet'), repT1: $('repT1'),
   reportMonthBody: $('reportMonthBody')
 };
 
@@ -415,8 +411,6 @@ function subscribeMonth(){
         trainingDates:   Array.isArray(d.trainingDates)   ? d.trainingDates   : [],
         oneTimePrice:    Number(d.oneTimePrice)  || 300,
         oneTimeVisitors: Array.isArray(d.oneTimeVisitors) ? d.oneTimeVisitors : [],
-        trainer1Pct:     d.trainer1Pct !== undefined ? Number(d.trainer1Pct) : 100,
-        trainer2Pct:     d.trainer2Pct !== undefined ? Number(d.trainer2Pct) : 0,
         rent:            Number(d.rent)          || 0,
         rentWorkDays:    Number(d.rentWorkDays)  || 0,
         rentPerDay:      Number(d.rentPerDay)    || 0,
@@ -428,7 +422,7 @@ function subscribeMonth(){
       // Brand-new month: pre-fill Tuesdays/Thursdays automatically so you
       // only have to type names and tick boxes, not add every date by hand.
       monthData = { subscriptions:[], trainingDates: generateWeekdayDates(currentYear, currentMonth, [2,4]),
-                    oneTimePrice:300, oneTimeVisitors:[], trainer1Pct:100, trainer2Pct:0, rent:0,
+                    oneTimePrice:300, oneTimeVisitors:[], rent:0,
                     rentWorkDays:0, rentPerDay:0, otherExp:0 };
       syncInputsFromData();
       renderAll();
@@ -439,8 +433,6 @@ function subscribeMonth(){
 
 function syncInputsFromData(){
   E.priceInput.value   = monthData.oneTimePrice || '';
-  E.trainer1Pct.value  = monthData.trainer1Pct;
-  E.trainer2Pct.value  = monthData.trainer2Pct;
   E.rentWorkDays.value = monthData.rentWorkDays || '';
   E.rentPerDay.value   = monthData.rentPerDay || '';
   E.rentInput.value    = monthData.rent || '';
@@ -714,10 +706,8 @@ E.priceInput.addEventListener('input', () => {
 });
 
 /* ======================== Settings ======================== */
-[E.trainer1Pct, E.trainer2Pct, E.rentInput, E.otherExpInput].forEach(inp => {
+[E.rentInput, E.otherExpInput].forEach(inp => {
   inp.addEventListener('input', () => {
-    monthData.trainer1Pct = Number(E.trainer1Pct.value)||0;
-    monthData.trainer2Pct = Number(E.trainer2Pct.value)||0;
     monthData.rent        = Number(E.rentInput.value)||0;
     monthData.otherExp    = Number(E.otherExpInput.value)||0;
     renderTrainerCalc(); scheduleSave();
@@ -766,16 +756,10 @@ function renderTrainerCalc(){
   const other = Number(monthData.otherExp)||0;
   const expenses = rent+other;
   const net = Math.max(total-expenses, 0);
-  const t1pct = Number(monthData.trainer1Pct)||0;
-  const t2pct = Number(monthData.trainer2Pct)||0;
 
   E.resTotal.textContent    = fmtUah(total);
   E.resExpenses.textContent = fmtUah(expenses);
   E.resNet.textContent      = fmtUah(net);
-  E.resT1.textContent       = fmtUah(Math.round(net*t1pct/100));
-  E.resT2.textContent       = fmtUah(Math.round(net*t2pct/100));
-  E.t1pct.textContent       = t1pct;
-  E.t2pct.textContent       = t2pct;
 }
 
 /* ======================== Period report ======================== */
@@ -948,12 +932,10 @@ async function runPeriodReport(){
       const other = Number(d.otherExp)||0;
       const expenses = rent+other;
       const net = Math.max(total-expenses,0);
-      const t1pct = Number(d.trainer1Pct)||0;
-      const t2pct = Number(d.trainer2Pct)||0;
 
       rows.push({
         year, month, subTotal, oneTimeTotal, total, expenses, net,
-        t1: Math.round(net*t1pct/100), t2: Math.round(net*t2pct/100)
+        t1: net
       });
     });
 
@@ -980,7 +962,7 @@ function renderPeriodReport(rows){
   const sum = key => rows.reduce((s,r)=>s+r[key],0);
   const subTotal = sum('subTotal'), oneTimeTotal = sum('oneTimeTotal'),
         total = sum('total'), expenses = sum('expenses'), net = sum('net'),
-        t1 = sum('t1'), t2 = sum('t2');
+        t1 = sum('t1');
 
   E.repSubTotal.textContent = fmtUah(subTotal);
   E.repOneTime.textContent  = fmtUah(oneTimeTotal);
@@ -988,7 +970,6 @@ function renderPeriodReport(rows){
   E.repExpenses.textContent = fmtUah(expenses);
   E.repNet.textContent      = fmtUah(net);
   E.repT1.textContent       = fmtUah(t1);
-  E.repT2.textContent       = fmtUah(t2);
 
   E.reportMonthBody.innerHTML = rows.map(r => `
     <tr>
