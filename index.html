@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Танцевальная студия</title>
 <link rel="stylesheet" href="style.css">
-<!-- TEMPORARY debug console for diagnosing mobile issues — remove once fixed -->
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -37,6 +34,9 @@
 
 <!-- Main App -->
 <div id="mainApp" class="app" hidden>
+
+  <button id="mobileMenuBtn" class="mobile-menu-btn">☰</button>
+  <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
   <aside class="sidebar glass">
     <div class="sidebar-brand">
